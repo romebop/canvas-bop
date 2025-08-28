@@ -21,11 +21,11 @@ type Scene = {
 };
 
 // --- Utils ---
-const DPR = () => (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
+const DPR = () => (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1); // get browser device pixel ratio
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-const measureText = (() => {
-  const cache = new Map<string, { w: number; h: number }>();
+const measureText = (() => { // get width and height of node based on text
+  const cache = new Map<string, { w: number; h: number }>(); 
   return (ctx: CanvasRenderingContext2D, text: string, font = '14px Inter, system-ui, sans-serif') => {
     const key = font + '|' + text;
     if (cache.has(key)) return cache.get(key)!;
@@ -47,6 +47,7 @@ function pointInRect(px: number, py: number, n: Node): boolean {
 
 // --- Component ---
 export default function ConversationCanvas() {
+  
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -67,6 +68,7 @@ export default function ConversationCanvas() {
   const [hoverId, setHoverId] = useState<NodeId | null>(null);
   const [selectedId, setSelectedId] = useState<NodeId | null>(null);
 
+  // make canvas responsive: set initial size and make it resize
   useEffect(() => {
     const el = canvasRef.current;
     const parent = containerRef.current;
@@ -106,6 +108,7 @@ export default function ConversationCanvas() {
     ctx.clearRect(0, 0, W, H);
     drawGrid(ctx, W, H, vp);
 
+    // draw edges
     ctx.lineWidth = 1;
     ctx.strokeStyle = '#C7CBD1';
     scene.edges.forEach(e => {
@@ -120,6 +123,7 @@ export default function ConversationCanvas() {
       ctx.stroke();
     });
 
+    // draw nodes
     Object.values(scene.nodes).forEach(n => {
       const { w, h } = measureText(ctx, n.text);
       if (w !== n.w || h !== n.h) n.w = w, n.h = h;
