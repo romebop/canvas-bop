@@ -61,6 +61,15 @@ const SendButton = styled.button`
   }
 `;
 
+const LoadingIndicator = styled.div`
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle fill='%23f1f1f1' cx='4' cy='12' r='3'%3E%3Canimate attributeName='cy' values='12;6;12;12' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1'/%3E%3C/circle%3E%3Ccircle fill='%23f1f1f1' cx='12' cy='12' r='3'%3E%3Canimate attributeName='cy' values='12;6;12;12' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1' begin='0.1s'/%3E%3C/circle%3E%3Ccircle fill='%23f1f1f1' cx='20' cy='12' r='3'%3E%3Canimate attributeName='cy' values='12;6;12;12' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1' begin='0.2s'/%3E%3C/circle%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+`;
+
 type MessageType = {
   role: 'system' | 'user' | 'assistant' | 'assistant_temp';
   content: string;
@@ -76,7 +85,7 @@ export default function Test() {
     if (!input.trim()) return;
 
     const userMessage: MessageType = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => [...prev, userMessage, { role: 'assistant_temp', content: '' }]);
     setInput('');
 
     const payload = {
@@ -131,26 +140,19 @@ export default function Test() {
 
         const { value, done } = await reader.read();
 
-        console.log('@@@ value:', value);
-        console.log('@@@ done:', done);
-
         if (done) break;
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
 
         for (const line of lines) {
-
-          console.log('@@@ line:', line);
-
-          const payload = line.replace(/^data: /, '');
-
-          console.log('@@@ payload:', payload);
-    
+          
+          const payload = line.replace(/^data: /, '');    
           if (payload === '[DONE]') continue;
-
+          
           const parsed = JSON.parse(payload);
           const content = parsed.choices[0].delta.content;
+          
           if (content) {
             assistantText += content;
             setMessages(prev => [
@@ -168,8 +170,8 @@ export default function Test() {
       }
     } catch (error) {
       console.error('Error fetching completion:', error);
-      const errorMessage: MessageType = { content: 'Error fetching response from the model.', role: 'assistant' };
-      setMessages(prev => [...prev, errorMessage]);
+      const errorMessage: MessageType = { role: 'system', content: 'Error fetching response from the model.' };
+      setMessages(prev => [...prev.filter(m => m.role !== 'assistant_temp'), errorMessage]);
     }
   };
 
@@ -177,9 +179,11 @@ export default function Test() {
     <ChatContainer>
       <MessageList>
         {messages.map((msg, index) => (
-          <Message key={index} from={msg.role}>
-            {msg.content}
-          </Message>
+          (msg.role === 'assistant_temp' && msg.content === '')
+              ? <LoadingIndicator />
+              : <Message key={index} from={msg.role}>
+                  {msg.content}
+                </Message>
         ))}
       </MessageList>
       <InputArea onSubmit={handleSend}>
