@@ -80,10 +80,36 @@ export default function Test() {
     setInput('');
 
     const payload = {
-      model: 'Qwen/Qwen2.5-Coder-32B-Instruct-GGUF:Q8_0',
-      messages: [...messages, userMessage], // include chat history
-      max_tokens: 150,
+      messages: [...messages, userMessage],
+
       stream: true,
+      cache_prompt: true,
+
+      samplers: 'edkypmxt',
+      temperature: 0.8,
+      dynatemp_range: 0,
+      dynatemp_exponent: 1,
+
+      top_k: 40,
+      top_p: 0.95,
+      min_p: 0.05,
+      typical_p: 1,
+
+      xtc_probability: 0,
+      xtc_threshold: 0.1,
+
+      repeat_last_n: 64,
+      repeat_penalty: 1,
+      presence_penalty: 0,
+      frequency_penalty: 0,
+
+      dry_multiplier: 0,
+      dry_base: 1.75,
+      dry_allowed_length: 2,
+      dry_penalty_last_n: -1,
+
+      max_tokens: -1,
+      timings_per_token: false
     };
 
     try {
@@ -104,13 +130,23 @@ export default function Test() {
       while (true) {
 
         const { value, done } = await reader.read();
+
+        console.log('@@@ value:', value);
+        console.log('@@@ done:', done);
+
         if (done) break;
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
 
         for (const line of lines) {
+
+          console.log('@@@ line:', line);
+
           const payload = line.replace(/^data: /, '');
+
+          console.log('@@@ payload:', payload);
+    
           if (payload === '[DONE]') continue;
 
           const parsed = JSON.parse(payload);
@@ -130,11 +166,6 @@ export default function Test() {
           }
         }
       }
-
-      const data = await response.json();
-      const botMessage: MessageType = { content: data.content, role: 'assistant' };
-      setMessages(prev => [...prev, botMessage]);
-
     } catch (error) {
       console.error('Error fetching completion:', error);
       const errorMessage: MessageType = { content: 'Error fetching response from the model.', role: 'assistant' };
