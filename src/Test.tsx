@@ -30,6 +30,7 @@ const Message = styled.div<{ from: 'system' | 'user' | 'assistant' | 'assistant_
   border-radius: 18px;
   max-width: 70%;
   word-wrap: break-word;
+  white-space: pre-wrap;
 `;
 
 const InputArea = styled.form`
@@ -140,7 +141,9 @@ export default function Test() {
 
         const { value, done } = await reader.read();
 
-        if (done) break;
+        if (done) {
+          break;
+        }
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
