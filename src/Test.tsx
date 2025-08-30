@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import styled from 'styled-components';
 
 const ChatContainer = styled.div`
@@ -20,6 +21,9 @@ const MessageList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
+  & > * {
+    flex-shrink: 0;
+  }
 `;
 
 const Message = styled.div<{ from: 'system' | 'user' | 'assistant' | 'assistant_temp' }>`
@@ -31,6 +35,10 @@ const Message = styled.div<{ from: 'system' | 'user' | 'assistant' | 'assistant_
   max-width: 70%;
   word-wrap: break-word;
   white-space: pre-wrap;
+  overflow-x: auto;
+  p {
+    margin: 0;
+  }
 `;
 
 const InputArea = styled.form`
@@ -185,7 +193,9 @@ export default function Test() {
           (msg.role === 'assistant_temp' && msg.content === '')
               ? <LoadingIndicator />
               : <Message key={index} from={msg.role}>
-                  {msg.content}
+                  <ReactMarkdown>
+                    {msg.content}
+                  </ReactMarkdown>
                 </Message>
         ))}
       </MessageList>
