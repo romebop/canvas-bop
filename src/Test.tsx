@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import styled from 'styled-components';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const ChatContainer = styled.div`
   display: flex;
@@ -35,9 +37,20 @@ const Message = styled.div<{ from: 'system' | 'user' | 'assistant' | 'assistant_
   max-width: 70%;
   word-wrap: break-word;
   white-space: pre-wrap;
-  overflow-x: auto;
   p {
     margin: 0;
+  }
+  pre {
+    background-color: #2d2d2d;
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+  }
+  code {
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-family: 'Courier New', Courier, monospace;
   }
 `;
 
@@ -193,7 +206,26 @@ export default function Test() {
           (msg.role === 'assistant_temp' && msg.content === '')
               ? <LoadingIndicator />
               : <Message key={index} from={msg.role}>
-                  <ReactMarkdown>
+                  <ReactMarkdown
+                    components={{
+                      code(props) {
+                        const {children, className, node, ...rest} = props
+                        const match = /language-(\w+)/.exec(className || '');
+                        return match
+                          ? <SyntaxHighlighter
+                              {...rest}
+                              language={match[1]}
+                              PreTag='div'
+                              style={vscDarkPlus}
+                            >
+                              {String(children).replace(/\n$/, '')}
+                            </SyntaxHighlighter>
+                          : <code className={className} {...props}>
+                              {children}
+                            </code>
+                      }
+                    }}
+                  >
                     {msg.content}
                   </ReactMarkdown>
                 </Message>
