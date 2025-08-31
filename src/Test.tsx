@@ -41,9 +41,6 @@ const Message = styled.div<{ from: 'system' | 'user' | 'assistant' | 'assistant_
     margin: 0;
   }
   pre {
-    background-color: #2d2d2d;
-    border-radius: 8px;
-    padding: 16px;
     overflow-x: auto;
   }
   code {
