@@ -157,14 +157,17 @@ export default function ConversationCanvas() {
 
     const delta = -e.deltaY;
     const zoomIntensity = 0.0015;
-    const newScale = clamp(vp.scale * (1 + delta * zoomIntensity), 0.25, 3);
 
-    const worldBefore = screenToWorld(mx, my);
-    setVp(prev => {
-      const worldAfter = screenToWorld(mx, my);
-      const dx = worldAfter.x - worldBefore.x;
-      const dy = worldAfter.y - worldBefore.y;
-      return { x: prev.x + dx, y: prev.y + dy, scale: newScale };
+    setVp(prevVp => {
+      const newScale = clamp(prevVp.scale * (1 + delta * zoomIntensity), 0.25, 3);
+
+      const worldX = mx / prevVp.scale - prevVp.x;
+      const worldY = my / prevVp.scale - prevVp.y;
+
+      const newX = mx / newScale - worldX;
+      const newY = my / newScale - worldY;
+
+      return { x: newX, y: newY, scale: newScale };
     });
   };
 
