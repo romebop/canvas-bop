@@ -301,6 +301,12 @@ export default function ConversationCanvas() {
         <button onClick={() => selectedId && startEditing(selectedId)} style={btnStyle}>Edit</button>
         <button onClick={() => selectedId && addChild(selectedId)} style={btnStyle}>Add Child (Enter)</button>
       </div>
+
+      <div style={{ position: 'absolute', right: 12, top: 12, zIndex: 3, background: 'rgba(0,0,0,0.5)', color: 'white', padding: '4px 8px', borderRadius: 4, fontFamily: 'monospace', pointerEvents: 'none' }}>
+        x: {vp.x.toFixed(2)}<br/>
+        y: {vp.y.toFixed(2)}<br/>
+        scale: {vp.scale.toFixed(2)}
+      </div>
     </div>
   );
 }
