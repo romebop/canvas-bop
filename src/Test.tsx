@@ -31,7 +31,7 @@ const MessageList = styled.div`
 const Message = styled.div<{ from: 'system' | 'user' | 'assistant' | 'assistant_temp' }>`
   align-self: ${props => (props.from === 'user' ? 'flex-end' : 'flex-start')};
   background-color: ${props => (props.from === 'user' ? '#007bff' : '#f1f1f1')};
-  color: ${props => (props.from === 'user' ? 'white' : 'black')};
+  color: ${props => (props.from === 'user' ? 'white' : props.from === 'system' ? 'red' : 'black')};
   padding: 10px 15px;
   border-radius: 18px;
   max-width: 70%;
