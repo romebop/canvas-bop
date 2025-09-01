@@ -7,6 +7,9 @@ import Test from './Test';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {/* <ConversationCanvas /> */}
-    <Test />
+    <div style={{ display: 'flex' }}>
+      <Test />
+      <Test />
+    </div>
   </StrictMode>,
 )
