@@ -309,17 +309,17 @@ function drawGrid(ctx: CanvasRenderingContext2D, W: number, H: number, vp: { x: 
   ctx.fillRect(0, 0, W, H);
 
   const grid = 24 * vp.scale;
-  const offsetX = (vp.x * vp.scale) % grid;
-  const offsetY = (vp.y * vp.scale) % grid;
+  const offsetX = ((vp.x * vp.scale) % grid + grid) % grid;
+  const offsetY = ((vp.y * vp.scale) % grid + grid) % grid;
 
   ctx.strokeStyle = '#E5E7EB';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  for (let x = -offsetX; x < W; x += grid) {
+  for (let x = offsetX - grid; x < W; x += grid) {
     ctx.moveTo(x, 0);
     ctx.lineTo(x, H);
   }
-  for (let y = -offsetY; y < H; y += grid) {
+  for (let y = offsetY - grid; y < H; y += grid) {
     ctx.moveTo(0, y);
     ctx.lineTo(W, y);
   }
