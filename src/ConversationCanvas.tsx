@@ -24,16 +24,26 @@ type Scene = {
 const DPR = () => (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1); // get browser device pixel ratio
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-const measureText = (() => { // get width and height of node based on text
-  const cache = new Map<string, { w: number; h: number }>(); 
-  return (ctx: CanvasRenderingContext2D, text: string, font = '14px Inter, system-ui, sans-serif') => {
-    const key = font + '|' + text;
+const measureText = (() => {
+  const cache = new Map<string, { w: number; h: number }>();
+  const FONT = '14px Inter, system-ui, sans-serif';
+  const LINE_HEIGHT = 20;
+  const PADDING = { x: 16, y: 12 };
+
+  return (ctx: CanvasRenderingContext2D, text: string) => {
+    const key = FONT + '|' + text;
     if (cache.has(key)) return cache.get(key)!;
+
     ctx.save();
-    ctx.font = font;
-    const metrics = ctx.measureText(text);
-    const w = metrics.width + 16;
-    const h = 20 + 12;
+    ctx.font = FONT;
+
+    const lines = text.split('\n');
+    const widths = lines.map(line => ctx.measureText(line).width);
+    const maxWidth = Math.max(0, ...widths);
+
+    const w = maxWidth + PADDING.x;
+    const h = lines.length * LINE_HEIGHT + PADDING.y;
+
     ctx.restore();
     const val = { w, h };
     cache.set(key, val);
@@ -141,7 +151,13 @@ export default function ConversationCanvas() {
       ctx.font = '14px Inter, system-ui, sans-serif';
       ctx.fillStyle = '#0F172A';
       ctx.textBaseline = 'top';
-      ctx.fillText(n.text, sx + 8, sy + 6, Math.max(0, n.w - 16));
+      const lines = n.text.split('\n');
+      const lineHeight = 20;
+      const startX = sx + 8;
+      const startY = sy + 6;
+      lines.forEach((line, i) => {
+        ctx.fillText(line, startX, startY + i * lineHeight, Math.max(0, n.w - 16));
+      });
       ctx.restore();
     });
   };
