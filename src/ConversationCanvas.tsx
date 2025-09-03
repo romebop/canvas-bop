@@ -201,10 +201,22 @@ export default function ConversationCanvas() {
     if (hit) {
       setSelectedId(hit.id);
       setPanning(null);
-      if (e.detail === 2) startEditing(hit.id);
     } else {
       setSelectedId(null);
       setPanning({ active: true, sx: e.clientX, sy: e.clientY, ox: vp.x, oy: vp.y });
+    }
+  };
+
+  const onDoubleClick = (e: React.MouseEvent) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const { x, y } = screenToWorld(sx, sy);
+
+    const hit = Object.values(scene.nodes).reverse().find(n => pointInRect(x, y, n));
+    if (hit) {
+      startEditing(hit.id);
     }
   };
 
@@ -256,7 +268,7 @@ export default function ConversationCanvas() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && selectedId && !editing) {
-        addChild(selectedId, '');
+        startEditing(selectedId);
       }
       if (editing && e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -312,6 +324,7 @@ export default function ConversationCanvas() {
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseLeave}
+        onDoubleClick={onDoubleClick}
         style={{ display: 'block', cursor: panning?.active ? 'grabbing' : 'default' }}
       />
 
@@ -329,7 +342,6 @@ export default function ConversationCanvas() {
       <div style={{ position: 'absolute', left: 12, top: 12, display: 'flex', gap: 8, zIndex: 3 }}>
         <button onClick={() => setVp(v => ({ ...v, x: 0, y: 0, scale: 1 }))} style={btnStyle}>Reset View</button>
         <button onClick={() => selectedId && startEditing(selectedId)} style={btnStyle}>Edit</button>
-        <button onClick={() => selectedId && addChild(selectedId)} style={btnStyle}>Add Child (Enter)</button>
       </div>
 
       <div style={{ position: 'absolute', right: 12, top: 12, zIndex: 3, background: 'rgba(0,0,0,0.5)', color: 'white', padding: '4px 8px', borderRadius: 4, fontFamily: 'monospace', pointerEvents: 'none' }}>
