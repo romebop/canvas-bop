@@ -75,6 +75,7 @@ export default function ConversationCanvas() {
 
   const [vp, setVp] = useState({ x: 0, y: 0, scale: 1 });
   const [panning, setPanning] = useState<{ active: boolean; sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const [dragging, setDragging] = useState<{ id: NodeId; dx: number; dy: number } | null>(null);
   const [editing, setEditing] = useState<{ id: NodeId; value: string } | null>(null);
   const [hoverId, setHoverId] = useState<NodeId | null>(null);
   const [selectedId, setSelectedId] = useState<NodeId | null>(null);
@@ -201,8 +202,10 @@ export default function ConversationCanvas() {
     if (hit) {
       setSelectedId(hit.id);
       setPanning(null);
+      setDragging({ id: hit.id, dx: x - hit.x, dy: y - hit.y });
     } else {
       setSelectedId(null);
+      setDragging(null);
       setPanning({ active: true, sx: e.clientX, sy: e.clientY, ox: vp.x, oy: vp.y });
     }
   };
@@ -227,6 +230,25 @@ export default function ConversationCanvas() {
     const sy = e.clientY - rect.top;
     const { x, y } = screenToWorld(sx, sy);
 
+    if (dragging) {
+      setScene(s => {
+        const node = s.nodes[dragging.id];
+        if (!node) return s;
+        return {
+          ...s,
+          nodes: {
+            ...s.nodes,
+            [dragging.id]: {
+              ...node,
+              x: x - dragging.dx,
+              y: y - dragging.dy,
+            },
+          },
+        };
+      });
+      return;
+    }
+
     const hit = Object.values(scene.nodes).reverse().find(n => pointInRect(x, y, n));
     setHoverId(hit?.id || null);
 
@@ -235,8 +257,14 @@ export default function ConversationCanvas() {
     }
   };
 
-  const onMouseUp = () => setPanning(null);
-  const onMouseLeave = () => setPanning(null);
+  const onMouseUp = () => {
+    setPanning(null);
+    setDragging(null);
+  };
+  const onMouseLeave = () => {
+    setPanning(null);
+    setDragging(null);
+  };
 
   const startEditing = (id: NodeId) => {
     const n = scene.nodes[id];
@@ -325,7 +353,7 @@ export default function ConversationCanvas() {
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseLeave}
         onDoubleClick={onDoubleClick}
-        style={{ display: 'block', cursor: panning?.active ? 'grabbing' : 'default' }}
+        style={{ display: 'block', cursor: dragging || panning?.active ? 'grabbing' : hoverId ? 'grab' : 'default' }}
       />
 
       {editing && (
