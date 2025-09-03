@@ -60,6 +60,7 @@ export default function ConversationCanvas() {
   
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [scene, setScene] = useState<Scene>(() => {
     const rootId = uid();
@@ -269,6 +270,13 @@ export default function ConversationCanvas() {
     return () => window.removeEventListener('keydown', onKey);
   }, [selectedId, editing]);
 
+  useEffect(() => {
+    if (editing && textareaRef.current) {
+      const el = textareaRef.current;
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, [editing?.id]);
+
   const editorStyle = useMemo(() => {
     if (!editing) return { display: 'none' } as React.CSSProperties;
     const n = scene.nodes[editing.id];
@@ -309,6 +317,7 @@ export default function ConversationCanvas() {
 
       {editing && (
         <textarea
+          ref={textareaRef}
           autoFocus
           value={editing.value}
           onChange={(e) => setEditing({ id: editing.id, value: e.target.value })}
