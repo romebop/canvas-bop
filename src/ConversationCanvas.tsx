@@ -119,7 +119,7 @@ export default function ConversationCanvas() {
     drawGrid(ctx, W, H, vp);
 
     // draw edges
-    ctx.lineWidth = 1;
+    ctx.lineWidth = vp.scale;
     ctx.strokeStyle = '#C7CBD1';
     scene.edges.forEach(e => {
       const a = scene.nodes[e.from];
@@ -138,25 +138,27 @@ export default function ConversationCanvas() {
       const { w, h } = measureText(ctx, n.text);
       if (w !== n.w || h !== n.h) n.w = w, n.h = h;
       const { sx, sy } = worldToScreen(n.x, n.y);
+      const sw = n.w * vp.scale;
+      const sh = n.h * vp.scale;
 
-      const radius = 10;
-      roundRect(ctx, sx, sy, n.w, n.h, radius);
+      const radius = 10 * vp.scale;
+      roundRect(ctx, sx, sy, sw, sh, radius);
       ctx.fillStyle = '#FFFFFF';
       ctx.fill();
       ctx.strokeStyle = n.id === selectedId ? '#6366F1' : n.id === hoverId ? '#A3A3A3' : '#E5E7EB';
-      ctx.lineWidth = n.id === selectedId ? 2 : 1;
+      ctx.lineWidth = (n.id === selectedId ? 2 : 1) * vp.scale;
       ctx.stroke();
 
       ctx.save();
-      ctx.font = '14px Inter, system-ui, sans-serif';
+      ctx.font = `${14 * vp.scale}px Inter, system-ui, sans-serif`;
       ctx.fillStyle = '#0F172A';
       ctx.textBaseline = 'top';
       const lines = n.text.split('\n');
-      const lineHeight = 20;
-      const startX = sx + 8;
-      const startY = sy + 6;
+      const lineHeight = 20 * vp.scale;
+      const startX = sx + 8 * vp.scale;
+      const startY = sy + 6 * vp.scale;
       lines.forEach((line, i) => {
-        ctx.fillText(line, startX, startY + i * lineHeight, Math.max(0, n.w - 16));
+        ctx.fillText(line, startX, startY + i * lineHeight, Math.max(0, sw - 16 * vp.scale));
       });
       ctx.restore();
     });
@@ -272,17 +274,20 @@ export default function ConversationCanvas() {
     const n = scene.nodes[editing.id];
     if (!n) return { display: 'none' } as React.CSSProperties;
     const { sx, sy } = worldToScreen(n.x, n.y);
+    const sw = n.w * vp.scale;
+    const sh = n.h * vp.scale;
     return {
       position: 'absolute' as const,
-      left: sx + 6,
-      top: sy + 4,
-      width: n.w - 12,
-      height: n.h - 8,
-      font: '14px Inter, system-ui, sans-serif',
+      left: sx + 6 * vp.scale,
+      top: sy + 4 * vp.scale,
+      width: sw - 12 * vp.scale,
+      height: sh - 8 * vp.scale,
+      font: `${14 * vp.scale}px Inter, system-ui, sans-serif`,
+      lineHeight: `${20 * vp.scale}px`,
       color: '#0F172A',
-      border: '1px solid #6366F1',
-      borderRadius: 8,
-      padding: '6px 8px',
+      border: `${vp.scale}px solid #6366F1`,
+      borderRadius: 8 * vp.scale,
+      padding: `${6 * vp.scale}px ${8 * vp.scale}px`,
       outline: 'none',
       resize: 'none' as const,
       background: '#fff',
