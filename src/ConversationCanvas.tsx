@@ -168,6 +168,28 @@ export default function ConversationCanvas() {
 
   useEffect(() => { draw(); }, [scene, vp, hoverId, selectedId]);
 
+  useEffect(() => {
+    if (!selectedId) return;
+
+    setScene(s => {
+      const keys = Object.keys(s.nodes);
+      if (keys.length > 0 && keys[keys.length - 1] === selectedId) {
+        return s; // Already at the front
+      }
+
+      const { [selectedId]: selectedNode, ...otherNodes } = s.nodes;
+      if (!selectedNode) return s;
+
+      return {
+        ...s,
+        nodes: {
+          ...otherNodes,
+          [selectedId]: selectedNode,
+        },
+      };
+    });
+  }, [selectedId]);
+
   const onWheel = (e: React.WheelEvent) => {
     if (!canvasRef.current) return;
     e.preventDefault();
