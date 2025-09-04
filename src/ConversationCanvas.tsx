@@ -151,22 +151,24 @@ export default function ConversationCanvas() {
       ctx.lineWidth = (n.id === selectedId ? 2 : 1) * vp.scale;
       ctx.stroke();
 
-      ctx.save();
-      ctx.font = `${14 * vp.scale}px Inter, system-ui, sans-serif`;
-      ctx.fillStyle = '#0F172A';
-      ctx.textBaseline = 'top';
-      const lines = n.text.split('\n');
-      const lineHeight = 20 * vp.scale;
-      const startX = sx + 8 * vp.scale;
-      const startY = sy + 6 * vp.scale;
-      lines.forEach((line, i) => {
-        ctx.fillText(line, startX, startY + i * lineHeight, Math.max(0, sw - 16 * vp.scale));
-      });
-      ctx.restore();
+      if (n.id !== editing?.id) {
+        ctx.save();
+        ctx.font = `${14 * vp.scale}px Inter, system-ui, sans-serif`;
+        ctx.fillStyle = '#0F172A';
+        ctx.textBaseline = 'top';
+        const lines = n.text.split('\n');
+        const lineHeight = 20 * vp.scale;
+        const startX = sx + 8 * vp.scale;
+        const startY = sy + 6 * vp.scale;
+        lines.forEach((line, i) => {
+          ctx.fillText(line, startX, startY + i * lineHeight, Math.max(0, sw - 16 * vp.scale));
+        });
+        ctx.restore();
+      }
     });
   };
 
-  useEffect(() => { draw(); }, [scene, vp, hoverId, selectedId]);
+  useEffect(() => { draw(); }, [scene, vp, hoverId, selectedId, editing]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -347,20 +349,21 @@ export default function ConversationCanvas() {
     const sw = n.w * vp.scale;
     const sh = n.h * vp.scale;
     return {
+      boxSizing: 'border-box' as const,
       position: 'absolute' as const,
-      left: sx + 6 * vp.scale,
-      top: sy + 4 * vp.scale,
-      width: sw - 12 * vp.scale,
-      height: sh - 8 * vp.scale,
+      left: sx + 8 * vp.scale,
+      top: sy + 3 * vp.scale,
+      width: sw - 16 * vp.scale,
+      height: sh - 12 * vp.scale,
       font: `${14 * vp.scale}px Inter, system-ui, sans-serif`,
       lineHeight: `${20 * vp.scale}px`,
       color: '#0F172A',
-      border: `${vp.scale}px solid #6366F1`,
-      borderRadius: 8 * vp.scale,
-      padding: `${6 * vp.scale}px ${8 * vp.scale}px`,
+      border: 'none',
+      borderRadius: 0,
+      padding: 0,
       outline: 'none',
       resize: 'none' as const,
-      background: '#fff',
+      background: 'transparent',
       zIndex: 2,
     };
   }, [editing, vp]);
