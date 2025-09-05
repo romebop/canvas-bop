@@ -77,7 +77,7 @@ export default function ConversationCanvas() {
   const [editing, setEditing] = useState<{ id: NodeId; value: string } | null>(null);
   const [hoverId, setHoverId] = useState<NodeId | null>(null);
   const [selectedId, setSelectedId] = useState<NodeId | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: NodeId | null } | null>(null);
 
   // make canvas responsive: set initial size and make it resize
   useEffect(() => {
@@ -142,7 +142,7 @@ export default function ConversationCanvas() {
       const sw = n.w * vp.scale;
       const sh = n.h * vp.scale;
 
-      const radius = 10 * vp.scale;
+      const radius = 4 * vp.scale;
       roundRect(ctx, sx, sy, sw, sh, radius);
       ctx.fillStyle = '#FFFFFF';
       ctx.fill();
@@ -251,15 +251,29 @@ export default function ConversationCanvas() {
     e.preventDefault();
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const { x, y } = screenToWorld(sx, sy);
+
+    const hit = Object.values(scene.nodes).reverse().find(n => pointInRect(x, y, n));
+    setContextMenu({ x: sx, y: sy, nodeId: hit?.id || null });
   };
 
   const addNode = () => {
     if (!contextMenu) return;
     const { x, y } = screenToWorld(contextMenu.x, contextMenu.y);
     const id = uid();
-    const newNode: Node = { id, x, y, w: 220, h: 60, text: 'New Node' };
+    const newNode: Node = { id, x, y, w: 220, h: 60, text: 'Ask me anything…' };
     setScene(s => ({ ...s, nodes: { ...s.nodes, [id]: newNode } }));
+    setContextMenu(null);
+  };
+
+  const deleteNode = (nodeId: NodeId) => {
+    setScene(s => {
+      const { [nodeId]: _, ...newNodes } = s.nodes;
+      const newEdges = s.edges.filter(edge => edge.from !== nodeId && edge.to !== nodeId);
+      return { nodes: newNodes, edges: newEdges };
+    });
     setContextMenu(null);
   };
 
@@ -336,6 +350,7 @@ export default function ConversationCanvas() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && selectedId && !editing) {
+        e.preventDefault();
         startEditing(selectedId);
       }
       if (editing && e.key === 'Enter' && !e.shiftKey) {
@@ -399,8 +414,25 @@ export default function ConversationCanvas() {
       />
 
       {contextMenu && (
-        <div style={{ position: 'absolute', left: contextMenu.x, top: contextMenu.y, zIndex: 10, background: 'white', border: '1px solid #E5E7EB', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', padding: 4 }}>
-          <button onClick={addNode} style={{...btnStyle, background: '#333'}}>Add Node</button>
+        <div style={{...contextMenuStyle, left: contextMenu.x, top: contextMenu.y }}>
+          <button
+            onClick={addNode}
+            style={contextMenuItemStyle}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f0f0f0'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            Add Node
+          </button>
+          {contextMenu.nodeId && (
+            <button
+              onClick={() => deleteNode(contextMenu.nodeId!)}
+              style={contextMenuItemStyle}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f0f0f0'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              Delete Node
+            </button>
+          )}
         </div>
       )}
 
@@ -485,5 +517,26 @@ const btnStyle: React.CSSProperties = {
   borderRadius: 10,
   padding: '8px 12px',
   font: '12px Inter, system-ui, sans-serif',
+  cursor: 'pointer',
+};
+
+const contextMenuStyle: React.CSSProperties = {
+  position: 'absolute',
+  background: 'white',
+  border: '1px solid #A0A0A0',
+  zIndex: 10,
+  padding: 0,
+};
+
+const contextMenuItemStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  background: 'none',
+  border: 'none',
+  borderRadius: 0,
+  color: 'black',
+  padding: '4px 20px',
+  font: '14px system-ui, sans-serif',
+  textAlign: 'left',
   cursor: 'pointer',
 };
