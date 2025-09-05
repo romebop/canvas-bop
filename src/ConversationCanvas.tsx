@@ -146,7 +146,7 @@ export default function ConversationCanvas() {
       roundRect(ctx, sx, sy, sw, sh, radius);
       ctx.fillStyle = '#FFFFFF';
       ctx.fill();
-      ctx.strokeStyle = n.id === selectedId ? '#6366F1' : n.id === hoverId ? '#A3A3A3' : '#E5E7EB';
+      ctx.strokeStyle = n.id === selectedId ? '#6366F1' : n.id === hoverId ? '#A3A3A3' : '#9CA3AF';
       ctx.lineWidth = (n.id === selectedId ? 2 : 1) * vp.scale;
       ctx.stroke();
 
@@ -449,7 +449,6 @@ export default function ConversationCanvas() {
 
       <div style={{ position: 'absolute', left: 12, top: 12, display: 'flex', gap: 8, zIndex: 3 }}>
         <button onClick={() => setVp(v => ({ ...v, x: 0, y: 0, scale: 1 }))} style={btnStyle}>Reset View</button>
-        <button onClick={() => selectedId && startEditing(selectedId)} style={btnStyle}>Edit</button>
       </div>
 
       <div style={{ position: 'absolute', right: 12, top: 12, zIndex: 3, background: 'rgba(0,0,0,0.5)', color: 'white', padding: '4px 8px', borderRadius: 4, fontFamily: 'monospace', pointerEvents: 'none' }}>
