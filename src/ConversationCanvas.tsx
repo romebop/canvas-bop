@@ -64,12 +64,10 @@ export default function ConversationCanvas() {
 
   const [scene, setScene] = useState<Scene>(() => {
     const rootId = uid();
-    const childId = uid();
     const nodes: Record<NodeId, Node> = {
       [rootId]: { id: rootId, x: 100, y: 100, w: 240, h: 60, text: 'Ask me anything…' },
-      [childId]: { id: childId, x: 380, y: 140, w: 260, h: 60, text: 'LLM reply will stream here.' },
     };
-    const edges: Edge[] = [{ from: rootId, to: childId }];
+    const edges: Edge[] = [];
     return { nodes, edges };
   });
 
