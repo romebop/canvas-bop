@@ -77,6 +77,7 @@ export default function ConversationCanvas() {
   const [editing, setEditing] = useState<{ id: NodeId; value: string } | null>(null);
   const [hoverId, setHoverId] = useState<NodeId | null>(null);
   const [selectedId, setSelectedId] = useState<NodeId | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // make canvas responsive: set initial size and make it resize
   useEffect(() => {
@@ -214,6 +215,7 @@ export default function ConversationCanvas() {
   };
 
   const onMouseDown = (e: React.MouseEvent) => {
+    setContextMenu(null);
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const sx = e.clientX - rect.left;
@@ -243,6 +245,22 @@ export default function ConversationCanvas() {
     if (hit) {
       startEditing(hit.id);
     }
+  };
+
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+  };
+
+  const addNode = () => {
+    if (!contextMenu) return;
+    const { x, y } = screenToWorld(contextMenu.x, contextMenu.y);
+    const id = uid();
+    const newNode: Node = { id, x, y, w: 220, h: 60, text: 'New Node' };
+    setScene(s => ({ ...s, nodes: { ...s.nodes, [id]: newNode } }));
+    setContextMenu(null);
   };
 
   const onMouseMove = (e: React.MouseEvent) => {
@@ -376,8 +394,15 @@ export default function ConversationCanvas() {
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseLeave}
         onDoubleClick={onDoubleClick}
+        onContextMenu={onContextMenu}
         style={{ display: 'block', cursor: dragging || panning?.active ? 'grabbing' : hoverId ? 'grab' : 'default' }}
       />
+
+      {contextMenu && (
+        <div style={{ position: 'absolute', left: contextMenu.x, top: contextMenu.y, zIndex: 10, background: 'white', border: '1px solid #E5E7EB', borderRadius: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', padding: 4 }}>
+          <button onClick={addNode} style={{...btnStyle, background: '#333'}}>Add Node</button>
+        </div>
+      )}
 
       {editing && (
         <textarea
