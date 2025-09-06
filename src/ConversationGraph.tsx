@@ -36,13 +36,15 @@ export default function ConversationGraph() {
   const [dragging, setDragging] = useState<{ id: NodeId; dx: number; dy: number } | null>(null);
   const [selectedId, setSelectedId] = useState<NodeId | null>(null);
   const [hoverId, setHoverId] = useState<NodeId | null>(null);
-  const [editing, setEditing] = useState<{ id: NodeId; value: string } | null>(null);
+  const [editing, setEditing] = useState<NodeId | null>(null);
+  const editingValueRef = useRef<string>('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: NodeId | null } | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const contentEditableRef = useRef<HTMLDivElement | null>(null);
 
   const screenToWorld = (sx: number, sy: number) => ({ x: (sx - vp.x) / vp.scale, y: (sy - vp.y) / vp.scale });
 
   const onMouseDown = (e: React.MouseEvent) => {
+    setContextMenu(null);
     setSelectedId(null);
     setEditing(null);
     setPanning({ active: true, sx: e.clientX, sy: e.clientY, ox: vp.x, oy: vp.y });
@@ -58,16 +60,16 @@ export default function ConversationGraph() {
 
   const onDoubleClick = (e: React.MouseEvent, nodeId: NodeId) => {
     e.stopPropagation();
-    const node = scene.nodes[nodeId];
-    if (!node) return;
-    setEditing({ id: nodeId, value: node.text });
+    setSelectedId(nodeId);
+    setEditing(nodeId);
+    editingValueRef.current = scene.nodes[nodeId]?.text || '';
   };
 
   const commitEdit = () => {
     if (!editing) return;
     setScene(s => ({
       ...s,
-      nodes: { ...s.nodes, [editing.id]: { ...s.nodes[editing.id], text: editing.value } },
+      nodes: { ...s.nodes, [editing]: { ...s.nodes[editing], text: editingValueRef.current } },
     }));
     setEditing(null);
   };
@@ -76,9 +78,8 @@ export default function ConversationGraph() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && selectedId && !editing) {
         e.preventDefault();
-        const node = scene.nodes[selectedId];
-        if (!node) return;
-        setEditing({ id: selectedId, value: node.text });
+        setEditing(selectedId);
+        editingValueRef.current = scene.nodes[selectedId]?.text || '';
       }
       if (editing && e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -93,12 +94,17 @@ export default function ConversationGraph() {
   }, [selectedId, editing]);
 
   useEffect(() => {
-    if (editing && textareaRef.current) {
-      const el = textareaRef.current;
+    if (editing && contentEditableRef.current) {
+      const el = contentEditableRef.current;
       el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
     }
-  }, [editing?.id]);
+  }, [editing]);
 
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -205,6 +211,7 @@ export default function ConversationGraph() {
         {Object.values(scene.nodes).map(node => {
           const isSelected = node.id === selectedId;
           const isHovered = node.id === hoverId;
+          const isEditing = editing === node.id;
 
           return (
             <div
@@ -222,38 +229,30 @@ export default function ConversationGraph() {
                 height: 'auto',
                 maxWidth: 560,
                 background: 'white',
-                border: `${isSelected ? 2 : 1}px solid ${isSelected ? '#6366F1' : isHovered ? '#A3A3A3' : '#9CA3AF'}`,
+                border: `1px solid transparent`,
                 borderRadius: 4,
+                boxShadow: `0 0 0 ${isSelected ? 2 : 1}px ${isSelected ? '#6366F1' : isHovered ? '#A3A3A3' : '#9CA3AF'}`,
                 padding: '8px 12px',
                 boxSizing: 'border-box',
                 cursor: dragging?.id === node.id ? 'grabbing' : 'grab',
-                userSelect: 'none',
+                userSelect: isEditing ? 'none' : 'auto',
                 zIndex: isSelected ? 1 : 0,
                 color: '#0F172A',
+                fontSize: 14,
+                lineHeight: '20px',
+                whiteSpace: 'pre-wrap',
               }}
             >
-              {editing?.id === node.id ? (
-                <textarea
-                  ref={textareaRef}
-                  value={editing.value}
-                  onChange={e => setEditing({ id: node.id, value: e.target.value })}
-                  onBlur={commitEdit}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    border: 'none',
-                    padding: 0,
-                    margin: 0,
-                    background: 'transparent',
-                    outline: 'none',
-                    resize: 'none',
-                    font: 'inherit',
-                    color: 'inherit',
-                  }}
-                />
-              ) : (
-                node.text
-              )}
+              <div
+                ref={isEditing ? contentEditableRef : null}
+                contentEditable={isEditing}
+                suppressContentEditableWarning={true}
+                onInput={e => editingValueRef.current = e.currentTarget.innerText}
+                onBlur={commitEdit}
+                style={{ outline: 'none' }}
+              >
+                {node.text}
+              </div>
             </div>
           );
         })}
