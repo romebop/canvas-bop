@@ -25,10 +25,11 @@ const DPR = () => (typeof window !== 'undefined' ? window.devicePixelRatio || 1 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 const measureText = (() => {
-  const cache = new Map<string, { w: number; h: number }>();
+  const cache = new Map<string, { w: number; h: number; lines: string[] }>();
   const FONT = '14px Inter, system-ui, sans-serif';
   const LINE_HEIGHT = 20;
   const PADDING = { x: 16, y: 12 };
+  const MAX_WIDTH = 560;
 
   return (ctx: CanvasRenderingContext2D, text: string) => {
     const key = FONT + '|' + text;
@@ -37,15 +38,38 @@ const measureText = (() => {
     ctx.save();
     ctx.font = FONT;
 
-    const lines = text.split('\n');
-    const widths = lines.map(line => ctx.measureText(line).width);
+    const wrappedLines: string[] = [];
+    const originalLines = text.split('\n');
+
+    for (const line of originalLines) {
+      if (line === '') {
+        wrappedLines.push('');
+        continue;
+      }
+      let currentLine = '';
+      const words = line.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const { width } = ctx.measureText(testLine);
+        if (width > MAX_WIDTH && i > 0) {
+          wrappedLines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      wrappedLines.push(currentLine);
+    }
+
+    const widths = wrappedLines.map(line => ctx.measureText(line).width);
     const maxWidth = Math.max(0, ...widths);
 
     const w = maxWidth + PADDING.x;
-    const h = lines.length * LINE_HEIGHT + PADDING.y;
+    const h = wrappedLines.length * LINE_HEIGHT + PADDING.y;
 
     ctx.restore();
-    const val = { w, h };
+    const val = { w, h, lines: wrappedLines };
     cache.set(key, val);
     return val;
   };
@@ -136,7 +160,7 @@ export default function ConversationCanvas() {
 
     // draw nodes
     Object.values(scene.nodes).forEach(n => {
-      const { w, h } = measureText(ctx, n.text);
+      const { w, h, lines } = measureText(ctx, n.text);
       if (w !== n.w || h !== n.h) n.w = w, n.h = h;
       const { sx, sy } = worldToScreen(n.x, n.y);
       const sw = n.w * vp.scale;
@@ -155,7 +179,6 @@ export default function ConversationCanvas() {
         ctx.font = `${14 * vp.scale}px Inter, system-ui, sans-serif`;
         ctx.fillStyle = '#0F172A';
         ctx.textBaseline = 'top';
-        const lines = n.text.split('\n');
         const lineHeight = 20 * vp.scale;
         const startX = sx + 8 * vp.scale;
         const startY = sy + 6 * vp.scale;
