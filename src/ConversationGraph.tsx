@@ -40,10 +40,14 @@ export default function ConversationGraph() {
   const editingValueRef = useRef<string>('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: NodeId | null } | null>(null);
   const contentEditableRef = useRef<HTMLDivElement | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
   const screenToWorld = (sx: number, sy: number) => ({ x: (sx - vp.x) / vp.scale, y: (sy - vp.y) / vp.scale });
 
   const onMouseDown = (e: React.MouseEvent) => {
+    if (contextMenuRef.current?.contains(e.target as Node)) {
+      return;
+    }
     setContextMenu(null);
     setSelectedId(null);
     setEditing(null);
@@ -259,7 +263,7 @@ export default function ConversationGraph() {
       </div>
 
       {contextMenu && (
-        <div style={{ position: 'absolute', left: contextMenu.x, top: contextMenu.y, background: 'white', border: '1px solid #A0A0A0', zIndex: 10, padding: 0 }}>
+        <div ref={contextMenuRef} style={{ position: 'absolute', left: contextMenu.x, top: contextMenu.y, background: 'white', border: '1px solid #A0A0A0', zIndex: 10, padding: 0 }}>
           <button
             onClick={addNode}
             style={{ display: 'block', width: '100%', background: 'none', border: 'none', borderRadius: 0, color: 'black', padding: '4px 20px', font: '14px system-ui, sans-serif', textAlign: 'left', cursor: 'pointer' }}
