@@ -1,5 +1,20 @@
 import React, { useEffect, useState, useRef } from 'react';
 
+const UserIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+    <path d="M8 8C9.65685 8 11 6.65685 11 5C11 3.34315 9.65685 2 8 2C6.34315 2 5 3.34315 5 5C5 6.65685 6.34315 8 8 8Z" stroke="#64748B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M13 14C13 11.2386 10.7614 9 8 9C5.23858 9 3 11.2386 3 14" stroke="#64748B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const BotIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
+    <rect x="2.75" y="4.75" width="10.5" height="6.5" rx="1.25" stroke="#64748B" strokeWidth="1.5"/>
+    <circle cx="6.5" cy="8" r="0.5" fill="#64748B"/>
+    <circle cx="9.5" cy="8" r="0.5" fill="#64748B"/>
+  </svg>
+);
+
 export type NodeId = string;
 
 type Node = {
@@ -9,6 +24,7 @@ type Node = {
   w: number;
   h: number;
   text: string;
+  author: 'user' | 'llm';
   parentId?: NodeId;
 };
 
@@ -25,7 +41,7 @@ export default function ConversationGraph() {
   const [scene, setScene] = useState<Scene>(() => {
     const rootId = uid();
     const nodes: Record<NodeId, Node> = {
-      [rootId]: { id: rootId, x: 100, y: 100, w: 240, h: 60, text: 'Ask me anything…' },
+      [rootId]: { id: rootId, x: 100, y: 100, w: 240, h: 60, text: 'Ask me anything…', author: 'user' },
     };
     const edges: Edge[] = [];
     return { nodes, edges };
@@ -121,7 +137,7 @@ export default function ConversationGraph() {
     if (!contextMenu) return;
     const { x, y } = screenToWorld(contextMenu.x, contextMenu.y);
     const id = uid();
-    const newNode: Node = { id, x, y, w: 220, h: 60, text: 'Ask me anything…' };
+    const newNode: Node = { id, x, y, w: 220, h: 60, text: 'Ask me anything…', author: 'user' };
     setScene(s => ({ ...s, nodes: { ...s.nodes, [id]: newNode } }));
     setContextMenu(null);
   };
@@ -245,15 +261,21 @@ export default function ConversationGraph() {
                 fontSize: 14,
                 lineHeight: '20px',
                 whiteSpace: 'pre-wrap',
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'flex-start',
               }}
             >
+              <div style={{ marginTop: '2px', flexShrink: 0 }}>
+                {node.author === 'user' ? <UserIcon /> : <BotIcon />}
+              </div>
               <div
                 ref={isEditing ? contentEditableRef : null}
                 contentEditable={isEditing}
                 suppressContentEditableWarning={true}
                 onInput={e => editingValueRef.current = e.currentTarget.innerText}
                 onBlur={commitEdit}
-                style={{ outline: 'none' }}
+                style={{ outline: 'none', width: '100%' }}
               >
                 {node.text}
               </div>
