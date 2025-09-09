@@ -15,6 +15,12 @@ const BotIcon = () => (
   </svg>
 );
 
+const PlayIcon = () => (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4.66669 2.66663L11.3334 7.99996L4.66669 13.3333V2.66663Z" fill="#64748B"/>
+    </svg>
+);
+
 export type NodeId = string;
 
 type Node = {
@@ -57,6 +63,32 @@ export default function ConversationGraph() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: NodeId | null } | null>(null);
   const contentEditableRef = useRef<HTMLDivElement | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const nodeRefs = useRef<Record<NodeId, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    const newNodes: Record<NodeId, Node> = { ...scene.nodes };
+    let hasChanges = false;
+
+    Object.keys(newNodes).forEach(nodeId => {
+      const element = nodeRefs.current[nodeId];
+      const node = newNodes[nodeId];
+
+      if (element && node) {
+        const rect = element.getBoundingClientRect();
+        const newWidth = rect.width / vp.scale;
+        const newHeight = rect.height / vp.scale;
+
+        if (Math.abs(node.w - newWidth) > 0.1 || Math.abs(node.h - newHeight) > 0.1) {
+          newNodes[nodeId] = { ...node, w: newWidth, h: newHeight };
+          hasChanges = true;
+        }
+      }
+    });
+
+    if (hasChanges) {
+      setScene(s => ({ ...s, nodes: newNodes }));
+    }
+  }, [scene.nodes, vp.scale]);
 
   const screenToWorld = (sx: number, sy: number) => ({ x: (sx - vp.x) / vp.scale, y: (sy - vp.y) / vp.scale });
 
@@ -140,6 +172,31 @@ export default function ConversationGraph() {
     const newNode: Node = { id, x, y, w: 220, h: 60, text: 'Ask me anything…', author: 'user' };
     setScene(s => ({ ...s, nodes: { ...s.nodes, [id]: newNode } }));
     setContextMenu(null);
+  };
+
+  const addBotResponse = (parentNodeId: NodeId) => {
+    const parentNode = scene.nodes[parentNodeId];
+    if (!parentNode) return;
+
+    const id = uid();
+    const newNode: Node = {
+      id,
+      x: parentNode.x,
+      y: parentNode.y + parentNode.h + 60,
+      w: 240,
+      h: 60,
+      text: '...',
+      author: 'llm',
+      parentId: parentNodeId,
+    };
+
+    const newEdge: Edge = { from: parentNodeId, to: id };
+
+    setScene(s => ({
+      ...s,
+      nodes: { ...s.nodes, [id]: newNode },
+      edges: [...s.edges, newEdge],
+    }));
   };
 
   const deleteNode = (nodeId: NodeId) => {
@@ -228,6 +285,29 @@ export default function ConversationGraph() {
           transformOrigin: 'top left',
         }}
       >
+        {scene.edges.map(edge => {
+          const fromNode = scene.nodes[edge.from];
+          const toNode = scene.nodes[edge.to];
+          if (!fromNode || !toNode) return null;
+
+          const x1 = fromNode.x + fromNode.w / 2;
+          const y1 = fromNode.y + fromNode.h;
+          const x2 = toNode.x + toNode.w / 2;
+          const y2 = toNode.y;
+
+          return (
+            <svg key={`${edge.from}-${edge.to}`} style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible', pointerEvents: 'none', zIndex: -1 }}>
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke="#9CA3AF"
+                strokeWidth={1}
+              />
+            </svg>
+          );
+        })}
         {Object.values(scene.nodes).map(node => {
           const isSelected = node.id === selectedId;
           const isHovered = node.id === hoverId;
@@ -235,6 +315,7 @@ export default function ConversationGraph() {
 
           return (
             <div
+              ref={el => (nodeRefs.current[node.id] = el)}
               key={node.id}
               data-node-id={node.id}
               onMouseDown={e => onNodeMouseDown(e, node.id)}
@@ -279,6 +360,32 @@ export default function ConversationGraph() {
               >
                 {node.text}
               </div>
+              {node.author === 'user' && node.text.trim() !== '' && node.text !== 'Ask me anything…' && (
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addBotResponse(node.id);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    bottom: -10,
+                    right: -10,
+                    width: 20,
+                    height: 20,
+                    background: 'white',
+                    border: '1px solid #A3A3A3',
+                    borderRadius: 4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    zIndex: 2,
+                  }}
+                >
+                  <PlayIcon />
+                </div>
+              )}
             </div>
           );
         })}
