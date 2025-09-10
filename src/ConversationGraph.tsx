@@ -200,32 +200,34 @@ export default function ConversationGraph() {
   };
 
   const createNextUserNode = (parentNodeId: NodeId) => {
-    const parentNode = scene.nodes[parentNodeId];
-    if (!parentNode) return;
+    setScene(s => {
+      const parentNode = s.nodes[parentNodeId];
+      if (!parentNode) return s;
+    
+      const id = uid();
+      const newNode: Node = {
+        id,
+        x: parentNode.x,
+        y: parentNode.y + parentNode.h + 60,
+        w: 240,
+        h: 60,
+        text: '',
+        author: 'user',
+        parentId: parentNodeId,
+      };
+    
+      const newEdge: Edge = { from: parentNodeId, to: id };
+      
+      setSelectedId(id);
+      setEditing(id);
+      editingValueRef.current = '';
   
-    const id = uid();
-    const newNode: Node = {
-      id,
-      x: parentNode.x,
-      y: parentNode.y + parentNode.h + 60,
-      w: 240,
-      h: 60,
-      text: '',
-      author: 'user',
-      parentId: parentNodeId,
-    };
-  
-    const newEdge: Edge = { from: parentNodeId, to: id };
-  
-    setScene(s => ({
-      ...s,
-      nodes: { ...s.nodes, [id]: newNode },
-      edges: [...s.edges, newEdge],
-    }));
-  
-    setSelectedId(id);
-    setEditing(id);
-    editingValueRef.current = '';
+      return {
+        ...s,
+        nodes: { ...s.nodes, [id]: newNode },
+        edges: [...s.edges, newEdge],
+      };
+    });
   };
 
   const addBotResponse = async (parentNodeId: NodeId) => {
