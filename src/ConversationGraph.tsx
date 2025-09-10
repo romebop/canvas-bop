@@ -1,4 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const UserIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block' }}>
@@ -42,6 +45,28 @@ type Scene = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+const getConversationHistory = (leafNodeId: NodeId, nodes: Record<NodeId, Node>): { role: 'user' | 'assistant', content: string }[] => {
+  const history: { role: 'user' | 'assistant', content: string }[] = [];
+  let currentNodeId: NodeId | undefined = leafNodeId;
+
+  while (currentNodeId) {
+    const currentNode = nodes[currentNodeId];
+    if (currentNode) {
+      history.push({
+        role: currentNode.author === 'user' ? 'user' : 'assistant',
+        content: currentNode.text,
+      });
+      currentNodeId = currentNode.parentId;
+    }
+    else {
+      currentNodeId = undefined;
+    }
+  }
+
+  return history.reverse();
+};
+
 
 export default function ConversationGraph() {
   const [scene, setScene] = useState<Scene>(() => {
@@ -174,13 +199,42 @@ export default function ConversationGraph() {
     setContextMenu(null);
   };
 
-  const addBotResponse = (parentNodeId: NodeId) => {
+  const createNextUserNode = (parentNodeId: NodeId) => {
     const parentNode = scene.nodes[parentNodeId];
     if (!parentNode) return;
-
+  
     const id = uid();
     const newNode: Node = {
       id,
+      x: parentNode.x,
+      y: parentNode.y + parentNode.h + 60,
+      w: 240,
+      h: 60,
+      text: '',
+      author: 'user',
+      parentId: parentNodeId,
+    };
+  
+    const newEdge: Edge = { from: parentNodeId, to: id };
+  
+    setScene(s => ({
+      ...s,
+      nodes: { ...s.nodes, [id]: newNode },
+      edges: [...s.edges, newEdge],
+    }));
+  
+    setSelectedId(id);
+    setEditing(id);
+    editingValueRef.current = '';
+  };
+
+  const addBotResponse = async (parentNodeId: NodeId) => {
+    const parentNode = scene.nodes[parentNodeId];
+    if (!parentNode) return;
+
+    const botNodeId = uid();
+    const botNode: Node = {
+      id: botNodeId,
       x: parentNode.x,
       y: parentNode.y + parentNode.h + 60,
       w: 240,
@@ -189,14 +243,104 @@ export default function ConversationGraph() {
       author: 'llm',
       parentId: parentNodeId,
     };
-
-    const newEdge: Edge = { from: parentNodeId, to: id };
+    const newEdge: Edge = { from: parentNodeId, to: botNodeId };
 
     setScene(s => ({
       ...s,
-      nodes: { ...s.nodes, [id]: newNode },
+      nodes: { ...s.nodes, [botNodeId]: botNode },
       edges: [...s.edges, newEdge],
     }));
+
+    try {
+      const history = getConversationHistory(parentNodeId, scene.nodes);
+      const payload = {
+        messages: history,
+        stream: true,
+        cache_prompt: true,
+        samplers: 'edkypmxt',
+        temperature: 0.8,
+        dynatemp_range: 0,
+        dynatemp_exponent: 1,
+        top_k: 40,
+        top_p: 0.95,
+        min_p: 0.05,
+        typical_p: 1,
+        xtc_probability: 0,
+        xtc_threshold: 0.1,
+        repeat_last_n: 64,
+        repeat_penalty: 1,
+        presence_penalty: 0,
+        frequency_penalty: 0,
+        dry_multiplier: 0,
+        dry_base: 1.75,
+        dry_allowed_length: 2,
+        dry_penalty_last_n: -1,
+        max_tokens: -1,
+        timings_per_token: false
+      };
+
+      const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) throw new Error('Network response was not ok');
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let assistantText = '';
+      let finished = false;
+
+      while (!finished) {
+        const { value, done } = await reader.read();
+        if (done) {
+          finished = true;
+          break;
+        }
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
+
+        for (const line of lines) {
+          const payload = line.replace(/^data: /, '');
+          if (payload === '[DONE]') {
+            finished = true;
+            break;
+          }
+          
+          const parsed = JSON.parse(payload);
+          const content = parsed.choices[0].delta.content;
+
+          if (content) {
+            assistantText += content;
+            setScene(s => ({
+              ...s,
+              nodes: {
+                ...s.nodes,
+                [botNodeId]: { ...s.nodes[botNodeId], text: assistantText },
+              },
+            }));
+          }
+          if (parsed.choices[0].finish_reason === 'stop') {
+            finished = true;
+            break;
+          }
+        }
+      }
+      
+      createNextUserNode(botNodeId);
+
+    } catch (error) {
+      console.error('Error fetching completion:', error);
+      setScene(s => ({
+        ...s,
+        nodes: {
+          ...s.nodes,
+          [botNodeId]: { ...s.nodes[botNodeId], text: 'Error fetching response.' },
+        },
+      }));
+    }
   };
 
   const deleteNode = (nodeId: NodeId) => {
@@ -357,8 +501,30 @@ export default function ConversationGraph() {
                 onInput={e => editingValueRef.current = e.currentTarget.innerText}
                 onBlur={commitEdit}
                 style={{ outline: 'none', width: '100%' }}
+                className="prose"
               >
-                {node.text}
+                {isEditing ? node.text : <ReactMarkdown
+                    components={{
+                      code(props) {
+                        const {children, className, node, ...rest} = props
+                        const match = /language-(\w+)/.exec(className || '');
+                        return match
+                          ? <SyntaxHighlighter
+                              {...rest}
+                              language={match[1]}
+                              PreTag='div'
+                              style={vscDarkPlus}
+                            >
+                              {String(children).replace(/\n$/, '')}
+                            </SyntaxHighlighter>
+                          : <code className={className} {...props}>
+                              {children}
+                            </code>
+                      }
+                    }}
+                  >
+                    {node.text}
+                  </ReactMarkdown>}
               </div>
               {node.author === 'user' && node.text.trim() !== '' && node.text !== 'Ask me anything…' && (
                 <div
