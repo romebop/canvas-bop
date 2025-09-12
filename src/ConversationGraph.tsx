@@ -154,9 +154,11 @@ export default function ConversationGraph() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && selectedId && !editing) {
-        e.preventDefault();
-        setEditing(selectedId);
-        editingValueRef.current = scene.nodes[selectedId]?.text || '';
+        if (scene.nodes[selectedId]?.author === 'user') {
+          e.preventDefault();
+          setEditing(selectedId);
+          editingValueRef.current = scene.nodes[selectedId]?.text || '';
+        }
       }
       if (editing && e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -168,7 +170,7 @@ export default function ConversationGraph() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedId, editing]);
+  }, [selectedId, editing, scene.nodes]);
 
   useEffect(() => {
     if (editing && contentEditableRef.current) {
@@ -498,14 +500,14 @@ export default function ConversationGraph() {
               </div>
               <div
                 ref={isEditing ? contentEditableRef : null}
-                contentEditable={isEditing}
+                contentEditable={isEditing && node.author === 'user'}
                 suppressContentEditableWarning={true}
                 onInput={e => editingValueRef.current = e.currentTarget.innerText}
                 onBlur={commitEdit}
                 style={{ outline: 'none', width: '100%' }}
                 className="prose"
               >
-                {isEditing ? node.text : <ReactMarkdown
+                {isEditing && node.author === 'user' ? node.text : <ReactMarkdown
                     components={{
                       code(props) {
                         const {children, className, node, ...rest} = props
