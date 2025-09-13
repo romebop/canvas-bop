@@ -58,8 +58,7 @@ const getConversationHistory = (leafNodeId: NodeId, nodes: Record<NodeId, Node>)
         content: currentNode.text,
       });
       currentNodeId = currentNode.parentId;
-    }
-    else {
+    } else {
       currentNodeId = undefined;
     }
   }
@@ -137,9 +136,11 @@ export default function ConversationGraph() {
 
   const onDoubleClick = (e: React.MouseEvent, nodeId: NodeId) => {
     e.stopPropagation();
-    setSelectedId(nodeId);
-    setEditing(nodeId);
-    editingValueRef.current = scene.nodes[nodeId]?.text || '';
+    if (scene.nodes[nodeId]?.author === 'user') {
+      setSelectedId(nodeId);
+      setEditing(nodeId);
+      editingValueRef.current = scene.nodes[nodeId]?.text || '';
+    }
   };
 
   const commitEdit = () => {
@@ -243,7 +244,7 @@ export default function ConversationGraph() {
       y: parentNode.y + parentNode.h + 60,
       w: 240,
       h: 60,
-      text: '...',
+      text: '...', // Initial text for bot response
       author: 'llm',
       parentId: parentNodeId,
     };
@@ -410,15 +411,23 @@ export default function ConversationGraph() {
     });
   };
 
+  const gridSize = 24 * vp.scale;
+  const backgroundPosition = `${(vp.x % gridSize + gridSize) % gridSize}px ${(vp.y % gridSize + gridSize) % gridSize}px`;
+  const backgroundImage = `linear-gradient(to right, #E5E7EB 1px, transparent 1px), linear-gradient(to bottom, #E5E7EB 1px, transparent 1px)`;
+  const backgroundSize = `${gridSize}px ${gridSize}px`;
+
   return (
     <div
       style={{
         position: 'relative',
         width: '100%',
         height: '100vh',
-        background: '#F8FAFC',
+        backgroundColor: '#F8FAFC',
         overflow: 'hidden',
         cursor: panning?.active ? 'grabbing' : 'default',
+        backgroundImage,
+        backgroundSize,
+        backgroundPosition,
       }}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
@@ -426,7 +435,6 @@ export default function ConversationGraph() {
       onWheel={onWheel}
       onContextMenu={onContextMenu}
     >
-      <Grid vp={vp} />
       <div
         style={{
           transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.scale})`,
@@ -480,7 +488,7 @@ export default function ConversationGraph() {
                 background: 'white',
                 border: `1px solid transparent`,
                 borderRadius: 4,
-                boxShadow: `0 0 0 ${isSelected ? 2 : 1}px ${isSelected ? '#6366F1' : isHovered ? '#A3A3A3' : '#9CA3AF'}`,
+                boxShadow: `0 0 0 ${isSelected ? 2 : 1}px ${isSelected ? '#6366F1' : isHovered ? '#A3A3A3' : '#9CA3AF'} `,
                 padding: '8px 12px',
                 boxSizing: 'border-box',
                 cursor: dragging?.id === node.id ? 'grabbing' : 'grab',
@@ -504,8 +512,7 @@ export default function ConversationGraph() {
                 suppressContentEditableWarning={true}
                 onInput={e => editingValueRef.current = e.currentTarget.innerText}
                 onBlur={commitEdit}
-                style={{ outline: 'none', width: '100%' }}
-                className="prose"
+                style={{ outline: 'none', width: '100%', overflowWrap: 'break-word' }}
               >
                 {isEditing && node.author === 'user' ? node.text : <ReactMarkdown
                     components={{
@@ -518,6 +525,7 @@ export default function ConversationGraph() {
                               language={match[1]}
                               PreTag='div'
                               style={vscDarkPlus}
+                              customStyle={{ overflowX: 'auto' }}
                             >
                               {String(children).replace(/\n$/, '')}
                             </SyntaxHighlighter>
@@ -594,25 +602,5 @@ export default function ConversationGraph() {
         scale: {vp.scale.toFixed(2)}
       </div>
     </div>
-  );
-}
-
-function Grid({ vp }: { vp: { x: number, y: number, scale: number } }) {
-  const gridSize = 24 * vp.scale;
-  const backgroundPosition = `${(vp.x % gridSize + gridSize) % gridSize}px ${(vp.y % gridSize + gridSize) % gridSize}px`;
-  const backgroundImage = `linear-gradient(to right, #E5E7EB 1px, transparent 1px), linear-gradient(to bottom, #E5E7EB 1px, transparent 1px)`;
-  const backgroundSize = `${gridSize}px ${gridSize}px`;
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        backgroundImage,
-        backgroundSize,
-        backgroundPosition,
-      }}
-    />
   );
 }
