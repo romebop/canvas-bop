@@ -154,6 +154,13 @@ export default function ConversationGraph() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === ' ' && selectedId && !editing) {
+        const node = scene.nodes[selectedId];
+        if (node?.author === 'user' && node.text.trim() !== '' && node.text !== 'Ask me anything…') {
+          e.preventDefault();
+          addBotResponse(selectedId);
+        }
+      }
       if (e.key === 'Enter' && selectedId && !editing) {
         if (scene.nodes[selectedId]?.author === 'user') {
           e.preventDefault();
