@@ -523,6 +523,7 @@ export default function ConversationGraph() {
               >
                 {isEditing && node.author === 'user' ? node.text : <ReactMarkdown
                     components={{
+                      p: props => <p style={{ margin: 0 }} {...props} />,
                       code(props) {
                         const {children, className, node, ...rest} = props
                         const match = /language-(\w+)/.exec(className || '');
