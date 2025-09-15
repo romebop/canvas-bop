@@ -71,3 +71,10 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.node-text-content:empty::before {
+  content: 'Ask me anything…';
+  color: #9CA3AF;
+  pointer-events: none;
+  display: block;
+}

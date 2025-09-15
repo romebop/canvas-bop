@@ -28,7 +28,8 @@ const loadingIndicatorStyle: React.CSSProperties = {
   display: 'inline-block',
   width: '16px',
   height: '16px',
-  backgroundImage: `url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle fill='%2364748B' cx='3' cy='8' r='2'%3E%3Canimate attributeName='cy' values='8;4;8;8' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1'/%3E%3C/circle%3E%3Ccircle fill='%2364748B' cx='8' cy='8' r='2'%3E%3Canimate attributeName='cy' values='8;4;8;8' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1' begin='0.1s'/%3E%3C/circle%3E%3Ccircle fill='%2364748B' cx='13' cy='8' r='2'%3E%3Canimate attributeName='cy' values='8;4;8;8' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1' begin='0.2s'/%3E%3C/circle%3E%3C/svg%3E")`,
+  marginTop: '2px',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle fill='%239CA3AF' cx='3' cy='8' r='2'%3E%3Canimate attributeName='cy' values='8;4;8;8' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1'/%3E%3C/circle%3E%3Ccircle fill='%239CA3AF' cx='8' cy='8' r='2'%3E%3Canimate attributeName='cy' values='8;4;8;8' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1' begin='0.1s'/%3E%3C/circle%3E%3Ccircle fill='%239CA3AF' cx='13' cy='8' r='2'%3E%3Canimate attributeName='cy' values='8;4;8;8' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1' begin='0.2s'/%3E%3C/circle%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
   backgroundPosition: 'center',
 };
@@ -83,7 +84,7 @@ export default function ConversationGraph() {
   const [scene, setScene] = useState<Scene>(() => {
     const rootId = uid();
     const nodes: Record<NodeId, Node> = {
-      [rootId]: { id: rootId, x: 100, y: 100, w: 240, h: 60, text: 'Ask me anything…', author: 'user' },
+      [rootId]: { id: rootId, x: 100, y: 100, w: 240, h: 60, text: '', author: 'user' },
     };
     const edges: Edge[] = [];
     return { nodes, edges };
@@ -168,7 +169,7 @@ export default function ConversationGraph() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === ' ' && selectedId && !editing) {
         const node = scene.nodes[selectedId];
-        if (node?.author === 'user' && node.text.trim() !== '' && node.text !== 'Ask me anything…') {
+        if (node?.author === 'user' && node.text.trim() !== '') {
           e.preventDefault();
           addBotResponse(selectedId);
         }
@@ -216,7 +217,7 @@ export default function ConversationGraph() {
     if (!contextMenu) return;
     const { x, y } = screenToWorld(contextMenu.x, contextMenu.y);
     const id = uid();
-    const newNode: Node = { id, x, y, w: 220, h: 60, text: 'Ask me anything…', author: 'user' };
+    const newNode: Node = { id, x, y, w: 220, h: 60, text: '', author: 'user' };
     setScene(s => ({ ...s, nodes: { ...s.nodes, [id]: newNode } }));
     setContextMenu(null);
   };
@@ -503,6 +504,7 @@ export default function ConversationGraph() {
                 top: node.y,
                 width: 'auto',
                 height: 'auto',
+                minWidth: 240,
                 maxWidth: 560,
                 background: 'white',
                 border: `1px solid transparent`,
@@ -532,6 +534,7 @@ export default function ConversationGraph() {
                 onInput={e => editingValueRef.current = e.currentTarget.innerText}
                 onBlur={commitEdit}
                 style={{ outline: 'none', width: '100%', overflowWrap: 'break-word' }}
+                className="node-text-content"
               >
                 {node.author === 'llm' && node.text === LOADING_PLACEHOLDER ? (
                   <LoadingIndicator />
@@ -564,7 +567,7 @@ export default function ConversationGraph() {
                   </ReactMarkdown>
                 )}
               </div>
-              {node.author === 'user' && node.text.trim() !== '' && node.text !== 'Ask me anything…' && (
+              {node.author === 'user' && node.text.trim() !== '' && ( /* Removed 'Ask me anything...' condition */
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
