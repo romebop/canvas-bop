@@ -24,6 +24,17 @@ const PlayIcon = () => (
     </svg>
 );
 
+const loadingIndicatorStyle: React.CSSProperties = {
+  display: 'inline-block',
+  width: '16px',
+  height: '16px',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle fill='%2364748B' cx='3' cy='8' r='2'%3E%3Canimate attributeName='cy' values='8;4;8;8' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1'/%3E%3C/circle%3E%3Ccircle fill='%2364748B' cx='8' cy='8' r='2'%3E%3Canimate attributeName='cy' values='8;4;8;8' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1' begin='0.1s'/%3E%3C/circle%3E%3Ccircle fill='%2364748B' cx='13' cy='8' r='2'%3E%3Canimate attributeName='cy' values='8;4;8;8' keyTimes='0;0.286;0.571;1' dur='1.05s' repeatCount='indefinite' keySplines='.33,0,.66,.33;.33,.66,.66,1' begin='0.2s'/%3E%3C/circle%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'center',
+};
+
+const LoadingIndicator = () => <div style={loadingIndicatorStyle} />;
+
 export type NodeId = string;
 
 type Node = {
@@ -45,6 +56,7 @@ type Scene = {
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+const LOADING_PLACEHOLDER = '___LOADING___';
 
 const getConversationHistory = (leafNodeId: NodeId, nodes: Record<NodeId, Node>): { role: 'user' | 'assistant', content: string }[] => {
   const history: { role: 'user' | 'assistant', content: string }[] = [];
@@ -251,7 +263,7 @@ export default function ConversationGraph() {
       y: parentNode.y + parentNode.h + 60,
       w: 240,
       h: 60,
-      text: '...', // Initial text for bot response
+      text: LOADING_PLACEHOLDER,
       author: 'llm',
       parentId: parentNodeId,
     };
@@ -521,7 +533,12 @@ export default function ConversationGraph() {
                 onBlur={commitEdit}
                 style={{ outline: 'none', width: '100%', overflowWrap: 'break-word' }}
               >
-                {isEditing && node.author === 'user' ? node.text : <ReactMarkdown
+                {node.author === 'llm' && node.text === LOADING_PLACEHOLDER ? (
+                  <LoadingIndicator />
+                ) : isEditing && node.author === 'user' ? (
+                  node.text
+                ) : (
+                  <ReactMarkdown
                     components={{
                       p: props => <p style={{ margin: 0 }} {...props} />,
                       code(props) {
@@ -544,7 +561,8 @@ export default function ConversationGraph() {
                     }}
                   >
                     {node.text}
-                  </ReactMarkdown>}
+                  </ReactMarkdown>
+                )}
               </div>
               {node.author === 'user' && node.text.trim() !== '' && node.text !== 'Ask me anything…' && (
                 <div
