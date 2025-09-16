@@ -49,7 +49,7 @@ type Node = {
   parentId?: NodeId;
 };
 
-type Edge = { from: NodeId; to: NodeId };
+type Edge = { from: NodeId; to: NodeId; fromPoint?: { x: number; y: number } };
 
 type Scene = {
   nodes: Record<NodeId, Node>;
@@ -71,7 +71,8 @@ const getConversationHistory = (leafNodeId: NodeId, nodes: Record<NodeId, Node>)
         content: currentNode.text,
       });
       currentNodeId = currentNode.parentId;
-    } else {
+    }
+    else {
       currentNodeId = undefined;
     }
   }
@@ -167,11 +168,35 @@ export default function ConversationGraph() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === ' ' && selectedId && !editing) {
-        const node = scene.nodes[selectedId];
-        if (node?.author === 'user' && node.text.trim() !== '') {
-          e.preventDefault();
-          addBotResponse(selectedId);
+      if (e.key === ' ' && !editing) {
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim() !== '') {
+          const selectedText = selection.toString().trim();
+          let anchorNode = selection.anchorNode;
+
+          if (anchorNode) {
+            const parentElement = anchorNode.nodeType === Node.TEXT_NODE ? anchorNode.parentElement : anchorNode as HTMLElement;
+            
+            if (parentElement) {
+              const nodeElement = parentElement.closest('[data-node-id]');
+              if (nodeElement) {
+                const nodeId = nodeElement.getAttribute('data-node-id');
+                if (nodeId && scene.nodes[nodeId] && scene.nodes[nodeId].author === 'llm') {
+                  e.preventDefault();
+                  addBranchFromSelection(nodeId, selectedText, selection);
+                  return;
+                }
+              }
+            }
+          }
+        }
+        
+        if (selectedId) {
+          const node = scene.nodes[selectedId];
+          if (node?.author === 'user' && node.text.trim() !== '') {
+            e.preventDefault();
+            addBotResponse(selectedId);
+          }
         }
       }
       if (e.key === 'Enter' && selectedId && !editing) {
@@ -251,6 +276,144 @@ export default function ConversationGraph() {
         edges: [...s.edges, newEdge],
       };
     });
+  };
+
+  const addBranchFromSelection = async (sourceNodeId: NodeId, selectedText: string, selection: Selection) => {
+    const sourceNode = scene.nodes[sourceNodeId];
+    if (!sourceNode) return;
+
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const screenX = rect.right;
+    const screenY = rect.top + rect.height / 2;
+    const worldPoint = screenToWorld(screenX, screenY);
+    const fromPoint = {
+        x: worldPoint.x - sourceNode.x,
+        y: worldPoint.y - sourceNode.y,
+    };
+
+    const userMessage = `"${selectedText}"\n\nExplain this part more.`;
+    const userNodeId = uid();
+    const userNode: Node = {
+        id: userNodeId,
+        x: 0, y: 0, w: 0, h: 0, // Not rendered
+        text: userMessage,
+        author: 'user',
+        parentId: sourceNodeId,
+    };
+
+    const botNodeId = uid();
+    const botNode: Node = {
+        id: botNodeId,
+        x: sourceNode.x + sourceNode.w + 40,
+        y: sourceNode.y,
+        w: 240,
+        h: 60,
+        text: LOADING_PLACEHOLDER,
+        author: 'llm',
+        parentId: userNodeId,
+    };
+    
+    const newEdge: Edge = { from: sourceNodeId, to: botNodeId, fromPoint };
+
+    const newNodesForHistory = { ...scene.nodes, [userNodeId]: userNode };
+
+    setScene(s => ({
+        ...s,
+        nodes: { ...s.nodes, [botNodeId]: botNode },
+        edges: [...s.edges, newEdge],
+    }));
+
+    try {
+        const history = getConversationHistory(userNodeId, newNodesForHistory);
+        const payload = {
+            messages: history,
+            stream: true,
+            cache_prompt: true,
+            samplers: 'edkypmxt',
+            temperature: 0.8,
+            dynatemp_range: 0,
+            dynatemp_exponent: 1,
+            top_k: 40,
+            top_p: 0.95,
+            min_p: 0.05,
+            typical_p: 1,
+            xtc_probability: 0,
+            xtc_threshold: 0.1,
+            repeat_last_n: 64,
+            repeat_penalty: 1,
+            presence_penalty: 0,
+            frequency_penalty: 0,
+            dry_multiplier: 0,
+            dry_base: 1.75,
+            dry_allowed_length: 2,
+            dry_penalty_last_n: -1,
+            max_tokens: -1,
+            timings_per_token: false
+        };
+
+        const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) throw new Error('Network response was not ok');
+
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let assistantText = '';
+        let finished = false;
+
+        while (!finished) {
+            const { value, done } = await reader.read();
+            if (done) {
+                finished = true;
+                break;
+            }
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
+
+            for (const line of lines) {
+                const payload = line.replace(/^data: /, '');
+                if (payload === '[DONE]') {
+                    finished = true;
+                    break;
+                }
+                
+                const parsed = JSON.parse(payload);
+                const content = parsed.choices[0].delta.content;
+
+                if (content) {
+                    assistantText += content;
+                    setScene(s => ({
+                        ...s,
+                        nodes: {
+                            ...s.nodes,
+                            [botNodeId]: { ...s.nodes[botNodeId], text: assistantText },
+                        },
+                    }));
+                }
+                if (parsed.choices[0].finish_reason === 'stop') {
+                    finished = true;
+                    break;
+                }
+            }
+        }
+        
+        createNextUserNode(botNodeId);
+
+    } catch (error) {
+        console.error('Error fetching completion:', error);
+        setScene(s => ({
+            ...s,
+            nodes: {
+                ...s.nodes,
+                [botNodeId]: { ...s.nodes[botNodeId], text: 'Error fetching response.' },
+            },
+        }));
+    }
   };
 
   const addBotResponse = async (parentNodeId: NodeId) => {
@@ -466,8 +629,8 @@ export default function ConversationGraph() {
           const toNode = scene.nodes[edge.to];
           if (!fromNode || !toNode) return null;
 
-          const x1 = fromNode.x + fromNode.w / 2;
-          const y1 = fromNode.y + fromNode.h;
+          const x1 = edge.fromPoint ? fromNode.x + edge.fromPoint.x : fromNode.x + fromNode.w / 2;
+          const y1 = edge.fromPoint ? fromNode.y + edge.fromPoint.y : fromNode.y + fromNode.h;
           const x2 = toNode.x + toNode.w / 2;
           const y2 = toNode.y;
 
