@@ -663,8 +663,7 @@ export default function ConversationGraph() {
               onMouseLeave={() => setHoverId(null)}
               style={{
                 position: 'absolute',
-                left: node.x,
-                top: node.y,
+                transform: `translate(${node.x}px, ${node.y}px)`,
                 width: 'auto',
                 height: 'auto',
                 minWidth: 240,
@@ -696,8 +695,14 @@ export default function ConversationGraph() {
                 suppressContentEditableWarning={true}
                 onInput={e => editingValueRef.current = e.currentTarget.innerText}
                 onBlur={commitEdit}
-                style={{ outline: 'none', width: '100%', overflowWrap: 'break-word' }}
+                style={{ outline: 'none', width: '100%', overflowWrap: 'break-word', cursor: dragging ? 'inherit' : 'text' }}
                 className="node-text-content"
+                onMouseDown={e => {
+                  if (!(isEditing && node.author === 'user')) {
+                    setSelectedId(node.id);
+                    e.stopPropagation();
+                  }
+                }}
               >
                 {node.author === 'llm' && node.text === LOADING_PLACEHOLDER ? (
                   <LoadingIndicator />
