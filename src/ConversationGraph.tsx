@@ -712,6 +712,15 @@ export default function ConversationGraph() {
                   <ReactMarkdown
                     components={{
                       p: props => <p style={{ margin: 0 }} {...props} />,
+                      h1: props => <h1 style={{ fontSize: '1.2em', margin: 0 }} {...props} />,
+                      h2: props => <h2 style={{ fontSize: '1.1em', margin: 0 }} {...props} />,
+                      h3: props => <h3 style={{ margin: 0 }} {...props} />,
+                      h4: props => <h4 style={{ fontSize: '1em', margin: 0 }} {...props} />,
+                      h5: props => <h5 style={{ fontSize: '0.9em', margin: 0 }} {...props} />,
+                      h6: props => <h6 style={{ fontSize: '0.8em', margin: 0 }} {...props} />,
+                      ul: props => <ul style={{ margin: 0, paddingLeft: '1.5em' }} {...props} />,
+                      ol: props => <ol style={{ margin: 0, paddingLeft: '1.5em' }} {...props} />,
+                      blockquote: props => <blockquote style={{ margin: 0, paddingLeft: '1em', borderLeft: '2px solid #ccc' }} {...props} />,
                       code(props) {
                         const {children, className, node, ...rest} = props
                         const match = /language-(\w+)/.exec(className || '');
