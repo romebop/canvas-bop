@@ -104,6 +104,16 @@ export default function ConversationGraph() {
   const nodeRefs = useRef<Record<NodeId, HTMLDivElement | null>>({});
 
   useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside, true);
+    return () => document.removeEventListener('mousedown', handleClickOutside, true);
+  }, []);
+
+  useEffect(() => {
     const newNodes: Record<NodeId, Node> = { ...scene.nodes };
     let hasChanges = false;
 
@@ -131,10 +141,6 @@ export default function ConversationGraph() {
   const screenToWorld = (sx: number, sy: number) => ({ x: (sx - vp.x) / vp.scale, y: (sy - vp.y) / vp.scale });
 
   const onMouseDown = (e: React.MouseEvent) => {
-    if (contextMenuRef.current?.contains(e.target as Node)) {
-      return;
-    }
-    setContextMenu(null);
     setSelectedId(null);
     setEditing(null);
     setPanning({ active: true, sx: e.clientX, sy: e.clientY, ox: vp.x, oy: vp.y });
@@ -698,6 +704,9 @@ export default function ConversationGraph() {
                 style={{ outline: 'none', width: '100%', overflowWrap: 'break-word', cursor: dragging ? 'inherit' : 'text' }}
                 className="node-text-content"
                 onMouseDown={e => {
+                  if (contextMenuRef.current?.contains(e.target as Node)) {
+                    return;
+                  }
                   if (!(isEditing && node.author === 'user')) {
                     setSelectedId(node.id);
                     e.stopPropagation();
