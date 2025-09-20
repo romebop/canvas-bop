@@ -24,6 +24,12 @@ const PlayIcon = () => (
     </svg>
 );
 
+const HaltIcon = () => (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="4" width="8" height="8" fill="#64748B"/>
+    </svg>
+);
+
 const loadingIndicatorStyle: React.CSSProperties = {
   display: 'inline-block',
   width: '16px',
@@ -102,6 +108,7 @@ export default function ConversationGraph() {
   const contentEditableRef = useRef<HTMLDivElement | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const nodeRefs = useRef<Record<NodeId, HTMLDivElement | null>>({});
+  const [abortControllers, setAbortControllers] = useState<Record<NodeId, AbortController>>({});
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -284,169 +291,21 @@ export default function ConversationGraph() {
     });
   };
 
-  const addBranchFromSelection = async (sourceNodeId: NodeId, selectedText: string, selection: Selection) => {
-    const sourceNode = scene.nodes[sourceNodeId];
-    if (!sourceNode) return;
-
-    const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    const screenX = rect.right;
-    const screenY = rect.top + rect.height / 2;
-    const worldPoint = screenToWorld(screenX, screenY);
-    const fromPoint = {
-        x: worldPoint.x - sourceNode.x,
-        y: worldPoint.y - sourceNode.y,
-    };
-
-    const userMessage = `"${selectedText}"\n\nExplain this part more.`;
-    const userNodeId = uid();
-    const userNode: Node = {
-        id: userNodeId,
-        x: 0, y: 0, w: 0, h: 0, // Not rendered
-        text: userMessage,
-        author: 'user',
-        parentId: sourceNodeId,
-    };
-
-    const botNodeId = uid();
-    const botNode: Node = {
-        id: botNodeId,
-        x: sourceNode.x + sourceNode.w + 40,
-        y: sourceNode.y,
-        w: 240,
-        h: 60,
-        text: LOADING_PLACEHOLDER,
-        author: 'llm',
-        parentId: userNodeId,
-    };
-    
-    const newEdge: Edge = { from: sourceNodeId, to: botNodeId, fromPoint };
-
-    const newNodesForHistory = { ...scene.nodes, [userNodeId]: userNode };
-
-    setScene(s => ({
-        ...s,
-        nodes: { ...s.nodes, [botNodeId]: botNode },
-        edges: [...s.edges, newEdge],
-    }));
-
-    try {
-        const history = getConversationHistory(userNodeId, newNodesForHistory);
-        const payload = {
-            messages: history,
-            stream: true,
-            cache_prompt: true,
-            samplers: 'edkypmxt',
-            temperature: 0.8,
-            dynatemp_range: 0,
-            dynatemp_exponent: 1,
-            top_k: 40,
-            top_p: 0.95,
-            min_p: 0.05,
-            typical_p: 1,
-            xtc_probability: 0,
-            xtc_threshold: 0.1,
-            repeat_last_n: 64,
-            repeat_penalty: 1,
-            presence_penalty: 0,
-            frequency_penalty: 0,
-            dry_multiplier: 0,
-            dry_base: 1.75,
-            dry_allowed_length: 2,
-            dry_penalty_last_n: -1,
-            max_tokens: -1,
-            timings_per_token: false
-        };
-
-        const response = await fetch('http://127.0.0.1:8080/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) throw new Error('Network response was not ok');
-
-        const reader = response.body!.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let assistantText = '';
-        let finished = false;
-
-        while (!finished) {
-            const { value, done } = await reader.read();
-            if (done) {
-                finished = true;
-                break;
-            }
-
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
-
-            for (const line of lines) {
-                const payload = line.replace(/^data: /, '');
-                if (payload === '[DONE]') {
-                    finished = true;
-                    break;
-                }
-                
-                const parsed = JSON.parse(payload);
-                const content = parsed.choices[0].delta.content;
-
-                if (content) {
-                    assistantText += content;
-                    setScene(s => ({
-                        ...s,
-                        nodes: {
-                            ...s.nodes,
-                            [botNodeId]: { ...s.nodes[botNodeId], text: assistantText },
-                        },
-                    }));
-                }
-                if (parsed.choices[0].finish_reason === 'stop') {
-                    finished = true;
-                    break;
-                }
-            }
-        }
-        
-        createNextUserNode(botNodeId);
-
-    } catch (error) {
-        console.error('Error fetching completion:', error);
-        setScene(s => ({
-            ...s,
-            nodes: {
-                ...s.nodes,
-                [botNodeId]: { ...s.nodes[botNodeId], text: 'Error fetching response.' },
-            },
-        }));
-    }
-  };
-
-  const addBotResponse = async (parentNodeId: NodeId) => {
-    const parentNode = scene.nodes[parentNodeId];
-    if (!parentNode) return;
-
-    const botNodeId = uid();
-    const botNode: Node = {
-      id: botNodeId,
-      x: parentNode.x,
-      y: parentNode.y + parentNode.h + 60,
-      w: 240,
-      h: 60,
-      text: LOADING_PLACEHOLDER,
-      author: 'llm',
-      parentId: parentNodeId,
-    };
-    const newEdge: Edge = { from: parentNodeId, to: botNodeId };
-
+  const fetchCompletion = async (
+    history: { role: 'user' | 'assistant', content: string }[],
+    botNodeId: NodeId,
+    signal: AbortSignal,
+    onDone?: (botNodeId: NodeId) => void
+  ) => {
     setScene(s => ({
       ...s,
-      nodes: { ...s.nodes, [botNodeId]: botNode },
-      edges: [...s.edges, newEdge],
+      nodes: {
+        ...s.nodes,
+        [botNodeId]: { ...s.nodes[botNodeId], text: LOADING_PLACEHOLDER },
+      },
     }));
 
     try {
-      const history = getConversationHistory(parentNodeId, scene.nodes);
       const payload = {
         messages: history,
         stream: true,
@@ -477,6 +336,7 @@ export default function ConversationGraph() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal,
       });
 
       if (!response.ok) throw new Error('Network response was not ok');
@@ -508,13 +368,16 @@ export default function ConversationGraph() {
 
           if (content) {
             assistantText += content;
-            setScene(s => ({
-              ...s,
-              nodes: {
-                ...s.nodes,
-                [botNodeId]: { ...s.nodes[botNodeId], text: assistantText },
-              },
-            }));
+            setScene(s => {
+              if (!s.nodes[botNodeId]) return s;
+              return {
+                ...s,
+                nodes: {
+                  ...s.nodes,
+                  [botNodeId]: { ...s.nodes[botNodeId], text: assistantText },
+                },
+              }
+            });
           }
           if (parsed.choices[0].finish_reason === 'stop') {
             finished = true;
@@ -522,19 +385,123 @@ export default function ConversationGraph() {
           }
         }
       }
-      
-      createNextUserNode(botNodeId);
-
     } catch (error) {
-      console.error('Error fetching completion:', error);
-      setScene(s => ({
-        ...s,
-        nodes: {
-          ...s.nodes,
-          [botNodeId]: { ...s.nodes[botNodeId], text: 'Error fetching response.' },
-        },
-      }));
+      if (error.name === 'AbortError') {
+        setScene(s => {
+          if (!s.nodes[botNodeId]) return s;
+          const currentText = s.nodes[botNodeId].text;
+          const newText = currentText === LOADING_PLACEHOLDER ? 'Halted.' : currentText + ' [Halted]';
+          return {
+            ...s,
+            nodes: {
+              ...s.nodes,
+              [botNodeId]: { ...s.nodes[botNodeId], text: newText },
+            },
+          }
+        });
+      } else {
+        console.error('Error fetching completion:', error);
+        setScene(s => {
+          if (!s.nodes[botNodeId]) return s;
+          return {
+            ...s,
+            nodes: {
+              ...s.nodes,
+              [botNodeId]: { ...s.nodes[botNodeId], text: 'Error fetching response.' },
+            },
+          }
+        });
+      }
+    } finally {
+      setAbortControllers(prev => {
+        const { [botNodeId]: _, ...rest } = prev;
+        return rest;
+      });
+      if (onDone) {
+        onDone(botNodeId);
+      }
     }
+  };
+
+  const addBranchFromSelection = async (sourceNodeId: NodeId, selectedText: string, selection: Selection) => {
+    const sourceNode = scene.nodes[sourceNodeId];
+    if (!sourceNode) return;
+
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const screenX = rect.right;
+    const screenY = rect.top + rect.height / 2;
+    const worldPoint = screenToWorld(screenX, screenY);
+    const fromPoint = {
+        x: worldPoint.x - sourceNode.x,
+        y: worldPoint.y - sourceNode.y,
+    };
+
+    const userMessage = `"${selectedText}"\n\nExplain this part more.`;
+    const userNodeId = uid();
+    const userNode: Node = {
+        id: userNodeId,
+        x: 0, y: 0, w: 0, h: 0, // Not rendered
+        text: userMessage,
+        author: 'user',
+        parentId: sourceNodeId,
+    };
+
+    const botNodeId = uid();
+    const botNode: Node = {
+        id: botNodeId,
+        x: sourceNode.x + sourceNode.w + 40,
+        y: sourceNode.y,
+        w: 240,
+        h: 60,
+        text: '',
+        author: 'llm',
+        parentId: userNodeId,
+    };
+    
+    const newEdge: Edge = { from: sourceNodeId, to: botNodeId, fromPoint };
+
+    const newNodesForHistory = { ...scene.nodes, [userNodeId]: userNode };
+
+    setScene(s => ({
+        ...s,
+        nodes: { ...s.nodes, [userNodeId]: userNode, [botNodeId]: botNode },
+        edges: [...s.edges, newEdge],
+    }));
+
+    const controller = new AbortController();
+    setAbortControllers(prev => ({ ...prev, [botNodeId]: controller }));
+    const history = getConversationHistory(userNodeId, newNodesForHistory);
+    fetchCompletion(history, botNodeId, controller.signal, createNextUserNode);
+  };
+
+  const addBotResponse = async (parentNodeId: NodeId) => {
+    const parentNode = scene.nodes[parentNodeId];
+    if (!parentNode) return;
+
+    const botNodeId = uid();
+    const botNode: Node = {
+      id: botNodeId,
+      x: parentNode.x,
+      y: parentNode.y + parentNode.h + 60,
+      w: 240,
+      h: 60,
+      text: '',
+      author: 'llm',
+      parentId: parentNodeId,
+    };
+    const newEdge: Edge = { from: parentNodeId, to: botNodeId };
+
+    setScene(s => ({
+      ...s,
+      nodes: { ...s.nodes, [botNodeId]: botNode },
+      edges: [...s.edges, newEdge],
+    }));
+
+    const controller = new AbortController();
+    setAbortControllers(prev => ({ ...prev, [botNodeId]: controller }));
+    const history = getConversationHistory(parentNodeId, scene.nodes);
+    fetchCompletion(history, botNodeId, controller.signal, createNextUserNode);
   };
 
   const deleteNode = (nodeId: NodeId) => {
@@ -657,6 +624,8 @@ export default function ConversationGraph() {
           const isSelected = node.id === selectedId;
           const isHovered = node.id === hoverId;
           const isEditing = editing === node.id;
+          
+          const streamingChild = Object.values(scene.nodes).find(n => n.parentId === node.id && abortControllers[n.id]);
 
           return (
             <div
@@ -753,11 +722,15 @@ export default function ConversationGraph() {
                   </ReactMarkdown>
                 )}
               </div>
-              {node.author === 'user' && node.text.trim() !== '' && ( /* Removed 'Ask me anything...' condition */
+              {node.author === 'user' && node.text.trim() !== '' && (
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
-                    addBotResponse(node.id);
+                    if (streamingChild) {
+                      abortControllers[streamingChild.id]?.abort();
+                    } else {
+                      addBotResponse(node.id);
+                    }
                   }}
                   style={{
                     position: 'absolute',
@@ -776,7 +749,7 @@ export default function ConversationGraph() {
                     zIndex: 2,
                   }}
                 >
-                  <PlayIcon />
+                  {streamingChild ? <HaltIcon /> : <PlayIcon />}
                 </div>
               )}
             </div>
